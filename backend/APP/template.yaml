@@ -1,0 +1,331 @@
+# Stack:LINE-UseCase-MembersCard
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  LINE-API-USE-CASE-MEMBERS-CARD
+
+  Sample SAM Template for LINE-API-USE-CASE-MEMBERS-CARD
+
+Globals:
+  Function:
+    Timeout: 3
+    MemorySize: !FindInMap [EnvironmentMap, !Ref Environment, LambdaMemorySize]
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+    Default: dev
+Mappings:
+  EnvironmentMap:
+    dev:
+      LINEOAChannelId: LINEOAChannelId
+      LIFFChannelId: LIFFChannelId
+      LIFFId: LIFFId
+      MembersInfoDBName: MembersInfoDBNameDev
+      ProductInfoDBName: ProductInfoDBNameDev
+      LINEChannelAccessTokenDBName: MembersCardChannelAccessTokenDBDev
+      FrontS3BucketName: S3 Name for FrontEnd
+      LayerVersion: Layer Version
+      LambdaMemorySize: 128 to 3008
+      LoggerLevel: DEBUG or INFO
+      # ### ACCESS LOG SETTING ###
+      # LogS3Bucket: S3 Name for AccessLogFile
+      # LogFilePrefix: memberscard-sample/
+      # ### ACCESS LOG SETTING ###
+    prod:
+      LINEOAChannelId: LINEOAChannelId
+      LIFFChannelId: LIFFChannelId
+      LIFFId: LIFFId
+      MembersInfoDBName: MembersInfoDBNameProd
+      ProductInfoDBName: ProductInfoDBNameProd
+      LINEChannelAccessTokenDBName: MembersCardChannelAccessTokenDBProd
+      FrontS3BucketName: S3 Name for FrontEnd
+      LayerVersion: Layer Version
+      LambdaMemorySize: 128 to 3008
+      LoggerLevel: DEBUG or INFO
+      # ### ACCESS LOG SETTING ###
+      # LogS3Bucket: S3 Name for AccessLogFile
+      # LogFilePrefix: memberscard-sample/
+      # ### ACCESS LOG SETTING ###
+
+Resources:
+  MembersCard:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: members_card/
+      FunctionName: !Sub MembersCard-UserInfoGet-${Environment}
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Layers:
+        - !Join
+          - ":"
+          - - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer"
+            - !ImportValue MembersCardLayerDev
+            - !FindInMap [EnvironmentMap, !Ref Environment, LayerVersion]
+      Environment:
+        Variables:
+          OA_CHANNEL_ID:
+            !FindInMap [EnvironmentMap, !Ref Environment, LINEOAChannelId]
+          LIFF_ID: !FindInMap [EnvironmentMap, !Ref Environment, LIFFId]
+          CHANNEL_ACCESS_TOKEN_DB:
+            !FindInMap [
+              EnvironmentMap,
+              !Ref Environment,
+              LINEChannelAccessTokenDBName,
+            ]
+          MEMBERS_INFO_DB:
+            !FindInMap [EnvironmentMap, !Ref Environment, MembersInfoDBName]
+          PRODUCT_INFO_DB:
+            !FindInMap [EnvironmentMap, !Ref Environment, ProductInfoDBName]
+          LIFF_CHANNEL_ID:
+            !FindInMap [EnvironmentMap, !Ref Environment, LIFFChannelId]
+      Events:
+        MembersCard:
+          Type: Api
+          Properties:
+            Path: /members_card
+            Method: post
+            RestApiId:
+              Ref: MembersCardApiGatewayApi
+      Role: !GetAtt lambdaFunctionRole.Arn
+  MembersCardApiGatewayApi:
+    Properties:
+      StageName: !Ref Environment
+      OpenApiVersion: 3.0.2
+    Type: AWS::Serverless::Api
+
+  LineMembersCardUserInfo:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: barcodeNum
+          AttributeType: N
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      TableName:
+        !FindInMap [EnvironmentMap, !Ref Environment, MembersInfoDBName]
+      GlobalSecondaryIndexes:
+        - IndexName: "barcodeNum-index"
+          KeySchema:
+            - AttributeName: "barcodeNum"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "KEYS_ONLY"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+  LineMembersCardProductInfo:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: productId
+          AttributeType: N
+      KeySchema:
+        - AttributeName: productId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      TableName:
+        !FindInMap [EnvironmentMap, !Ref Environment, ProductInfoDBName]
+
+  lambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: "AccessToDynamoDB"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LineMembersCardUserInfo}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LineMembersCardUserInfo}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LineMembersCardProductInfo}"
+                  - !Join
+                    - ""
+                    - - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/"
+                      - !FindInMap [
+                          EnvironmentMap,
+                          !Ref Environment,
+                          LINEChannelAccessTokenDBName,
+                        ]
+        - PolicyName: "PutLogToCloudWatch"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/MembersCard-*"
+
+  CloudFrontDistribution:
+    Type: "AWS::CloudFront::Distribution"
+    Properties:
+      DistributionConfig:
+        Origins:
+          - ConnectionAttempts: 3
+            ConnectionTimeout: 10
+            DomainName: !Sub "${S3Bucket}.s3.amazonaws.com"
+            Id: !Sub "S3-${S3Bucket}"
+            OriginPath: ""
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontCloudFrontOriginAccessIdentity}"
+        OriginGroups:
+          Quantity: 0
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - "HEAD"
+            - "DELETE"
+            - "POST"
+            - "GET"
+            - "OPTIONS"
+            - "PUT"
+            - "PATCH"
+          CachedMethods:
+            - "HEAD"
+            - "GET"
+          Compress: false
+          DefaultTTL: 0
+          ForwardedValues:
+            Cookies:
+              Forward: "none"
+            QueryString: false
+          MaxTTL: 0
+          MinTTL: 0
+          SmoothStreaming: false
+          TargetOriginId: !Sub "S3-${S3Bucket}"
+          ViewerProtocolPolicy: "redirect-to-https"
+        Comment: ""
+        PriceClass: "PriceClass_All"
+        Enabled: true
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+          MinimumProtocolVersion: "TLSv1"
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: "none"
+        HttpVersion: "http2"
+        DefaultRootObject: "index.html"
+        IPV6Enabled: true
+
+  S3Bucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName:
+        !FindInMap [EnvironmentMap, !Ref Environment, FrontS3BucketName]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "AES256"
+  # ### ACCESS LOG SETTING ###
+  #     LoggingConfiguration:
+  #       DestinationBucketName: !Ref AccessLogBucket
+  #       LogFilePrefix:
+  #         !FindInMap [EnvironmentMap, !Ref Environment, LogFilePrefix]
+  # AccessLogBucket:
+  #   Type: AWS::S3::Bucket
+  #   Properties:
+  #     BucketName: !FindInMap [EnvironmentMap, !Ref Environment, LogS3Bucket]
+  #     PublicAccessBlockConfiguration:
+  #       BlockPublicAcls: True
+  #       BlockPublicPolicy: True
+  #       IgnorePublicAcls: True
+  #       RestrictPublicBuckets: True
+  #     BucketEncryption:
+  #       ServerSideEncryptionConfiguration:
+  #         - ServerSideEncryptionByDefault:
+  #             SSEAlgorithm: "AES256"
+  #     AccessControl: LogDeliveryWrite
+  # ### ACCESS LOG SETTING ###
+
+  S3BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: "2008-10-17"
+        Id: "PolicyForCloudFrontPrivateContent"
+        Statement:
+          - Sid: "1"
+            Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontCloudFrontOriginAccessIdentity2}"
+            Action: "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
+          - Sid: "2"
+            Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontCloudFrontOriginAccessIdentity}"
+            Action: "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
+            Condition:
+              Bool:
+                "aws:SecureTransport": "true"
+          - Action: s3:*
+            Sid: 2
+            Effect: Deny
+            Principal: "*"
+            Resource: !Sub arn:aws:s3:::${S3Bucket}
+            Condition:
+              Bool:
+                "aws:SecureTransport": "false"
+
+  CloudFrontCloudFrontOriginAccessIdentity:
+    Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "access-identity-${S3Bucket}.s3.amazonaws.com"
+
+  CloudFrontCloudFrontOriginAccessIdentity2:
+    Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "access-identity-${S3Bucket}.s3.amazonaws.com"
+
+Outputs:
+  MembersCardApi:
+    Description: "API Gateway endpoint URL for Prod stage for Members Card function"
+    Value: !Sub "https://${MembersCardApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/members_card/"
+  CloudFrontDomainName:
+    Description: "CloudFront for MembersCard Demo"
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  LINEOAChannelId:
+    Description: "LINE OA ChannelId for LIFF APP"
+    Value: !FindInMap [EnvironmentMap, !Ref Environment, LINEOAChannelId]
