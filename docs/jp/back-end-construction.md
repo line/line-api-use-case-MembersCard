@@ -31,17 +31,17 @@ sam deploy --guided
     #SAM needs permission to be able to create roles to connect to the resources in your template Allow SAM CLI IAM role creation[Y/n]: Y
     Save arguments to samconfig.toml [Y/n]: Y
 
-    SAM configuration file [samconfig.toml]: 入力せずEnter 
+    SAM configuration file [samconfig.toml]: 入力せずEnter
     SAM configuration environment [default]: 入力せずEnter
-    
+
     Deploy this changeset? [y/N]: y
 ```
 
 - レイヤーバージョンをメモ  
-  デプロイ後、ターミナルの Outputs の項目に、レイヤー ARN とレイヤーバージョンが表示されるので、レイヤーバージョンをメモをしておく。 
+  デプロイ後、ターミナルの Outputs の項目に、レイヤー ARN とレイヤーバージョンが表示されるので、レイヤーバージョンをメモをしておく。
   レイヤーバージョンは末尾の数字の部分。  
   ※バージョンはデプロイするたびに更新されるので、初めてのデプロイの場合バージョン 1 となっているのが正しいです。
-  ![コマンドプロンプトのOutput部の画像](images/out-put-description.png)
+  ![コマンドプロンプトのOutput部の画像](../images/jp/out-put-description.png)
 
 - 【確認】AWS マネジメントコンソールで Lambda のコンソールを開き、左タブから「レイヤー」を選択し、今回デプロイしたレイヤーがあることを確認する。
 
@@ -75,8 +75,8 @@ sam deploy --guided
     #Shows you resources changes to be deployed and require a 'Y' to initiate deploy Confirm changes before deploy [Y/n]: Y
     #SAM needs permission to be able to create roles to connect to the resources in your template Allow SAM CLI IAM role creation[Y/n]: Y
     Save arguments to samconfig.toml [Y/n]: Y
-    
-    SAM configuration file [samconfig.toml]: 入力せずEnter 
+
+    SAM configuration file [samconfig.toml]: 入力せずEnter
     SAM configuration environment [default]: 入力せずEnter
 
     Deploy this changeset? [y/N]: y
@@ -88,13 +88,13 @@ sam deploy --guided
     なお、チャネル ID とチャネルシークレットは[LINE Developers コンソール](https://developers.line.biz/console/)のチャネル基本設定にて確認可能。
     - channelId: チャネル ID(文字列)
     - channelSecret : チャネルシークレット(文字列)
-      ![チャネルアクセストークンの登録](images/channel-access-token-table-record.png)
+      ![チャネルアクセストークンの登録](../images/jp/channel-access-token-table-record.png)
 - チャネルアクセストークン更新の Lambda 関数を実行する
   - AWS マネジメントコンソールにログインし、Lambda のコンソールを開く
   - 先ほど作成した Lambda 関数(関数名は MembersCard-PutAccessToken-{Environmentで指定した値})を開く
   - Lambda 関数のコンソール右上、テストイベントの選択プルダウンにて「テストイベントの設定」を選択する
   - 以下のようなウィンドウが開いたら、イベント名を入力し、イベント内容を空にして作成ボタンを押下する。
-    ![テストイベントの設定](images/test-event-set.png)
+    ![テストイベントの設定](../images/jp/test-event-set.png)
   - Lambda 関数のコンソール右上、テストボタンを押下してテスト実行を行う
 - 【確認】AWS マネジメントコンソールの DynamoDB コンソールにて、チャネルアクセストークンのテーブル開き、本アプリで利用する LINE チャネル ID のデータにchannelAccessToken, limitDate, updatedTimeの項目が追加されていることを確認する。
 
@@ -137,7 +137,7 @@ sam deploy --guided
     #SAM needs permission to be able to create roles to connect to the resources in your template Allow SAM CLI IAM role creation[Y/n]: Y
     ××××× may not have authorization defined, Is this okay? [y/N]: y (全てyと入力)  
 
-    SAM configuration file [samconfig.toml]: 入力せずEnter 
+    SAM configuration file [samconfig.toml]: 入力せずEnter
     SAM configuration environment [default]: 入力せずEnter
 
     Save arguments to samconfig.toml [Y/n]: Y
@@ -146,7 +146,7 @@ sam deploy --guided
 
 - API Gateway URLとCloufFrontDomainNameのメモ  
 デプロイ成功時にOutPutにて表示されるAPI Gateway endpointとCloudFrontDomainNameのメモを取ってください。後の手順にて利用します。
-  
+
 ## エラー対応
 - デプロイ時、以下のようなエラーが出た場合、こちらの手順で解消してください。
   ```
@@ -172,4 +172,4 @@ sam deploy --guided
 
 [次の頁へ](front-end-construction.md)
 
-[目次へ戻る](../README.md)
+[目次へ戻る](../../README.md)
